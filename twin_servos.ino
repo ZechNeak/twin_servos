@@ -35,7 +35,7 @@ const char prompt_normalize_pwm[] PROGMEM = "PROMPT: Do you want to instead turn
 const char warning_serial[] PROGMEM = "<Warning: Index has exceeded string length>\n";
 const char warning_pwm_bounds[] PROGMEM = "<Warning: Destination exceeds acceptable PWM bounds of 600-1500 usec>\n";
 const char error_invalid[] PROGMEM = "ERROR: please input a valid command.\n";
-const char error_move_bounds[] PROGMEM = "ERROR: please choose a degrees value between -360 and 360.\n";
+const char error_move_bounds[] PROGMEM = "ERROR: please choose a degrees value between -359 and 359.\n";
 const char error_goto_bounds[] PROGMEM = "ERROR: please choose a degrees value between 0 and 360.\n";
 const char pos_get1[] PROGMEM = "GET: Current motor position is ";
 const char pos_get2[] PROGMEM = " microsteps from origin";
@@ -113,6 +113,7 @@ void processCommand() {
   char *token;
   char commandMessage[numChars] = {};
   int commandArg = -1;
+  bool argFound = false;
   
   if (commandReady == true) {
     token = strtok(charData, " ");                            // isolate command
@@ -120,17 +121,24 @@ void processCommand() {
     token = strtok(NULL, "\n");                               // isolate argument
 
     if (token != NULL) {
+      argFound = true;
       if (token[0] == '-') commandArg = 0 - atoi(token+1);    // account for negative val
       else commandArg = atoi(token);
     }
     //else Serial.println("ERROR: Invalid input.\n  Try: [command] [arg]\n");
 
+    Serial.print(commandMessage);
+    Serial.print(" ");
+    if (argFound) {
+      Serial.println(commandArg);
+    }
+    else Serial.println();
 
     // Match command and execute it
     // TODO: Create an alphabetically sorted array of string-function pairs and use binary search instead
     if (strcmp(commandMessage, "pos") == 0) showCurrentPositions();
     else if (strcmp(commandMessage, "origin") == 0) updateOrigin();
-    else if (strcmp(commandMessage, "speed") == 0) updateSpeed(commandArg);
+    // else if (strcmp(commandMessage, "speed") == 0) updateSpeed(commandArg);
     else if (strcmp(commandMessage, "pwm") == 0) sendPwmSignal(commandArg);
     else if (strcmp(commandMessage, "move") == 0) displace(false, commandArg);
     else if (strcmp(commandMessage, "goto") == 0) displace(true, commandArg);
@@ -235,10 +243,10 @@ void updateOrigin() {
  *  Sets speed for the servo, which doesn't directly affect the servo operation,
  *  but is used to calculate the time duration to reach a certain destination.
 */
-void updateSpeed(int rev_per_sec) {
-  runningSpeed = rev_per_sec;
-  printFromFlashAndMore(speed_set1, runningSpeed, revs_per_sec);
-}
+// void updateSpeed(int rev_per_sec) {
+//   runningSpeed = rev_per_sec;
+//   printFromFlashAndMore(speed_set1, runningSpeed, revs_per_sec);
+// }
 
 
 /* 'pwm'
@@ -284,21 +292,22 @@ void sendPwmSignal(int target_pwm) {
   int sig = curr_pwm_x;
 
   if (curr_pwm_x <= target_pwm) {
-      while (sig <= target_pwm) {
-        servoX.writeMicroseconds(sig);
-        Serial.println(sig);
-        delay(15);
-        sig += 5;
+    while (sig <= target_pwm) {
+      servoX.writeMicroseconds(sig);
+      Serial.println(sig);
+      delay(15);
+      sig += 5;
     }
   }
   else { //turn backwards
-      while (sig >= target_pwm) { 
-        servoX.writeMicroseconds(sig);
-        Serial.println(sig);
-        delay(15);
-        sig -= 5;
+    while (sig >= target_pwm) {
+      servoX.writeMicroseconds(sig);
+      Serial.println(sig);
+      delay(15);
+      sig -= 5;
     }
   }
+  servoX.writeMicroseconds(target_pwm);   //final push to ensure accuracy
   curr_pwm_x = target_pwm;
   curr_pos_x = target_pos;
   // servoX.detach();
@@ -364,7 +373,7 @@ void displace(bool isAbsolute, int degrees) {
   int target_pwm;
 
   if (!isAbsolute) {
-    if ((degrees < -360) || (360 < degrees)) {
+    if ((degrees < -359) || (359 < degrees)) {
       printFromFlash(error_move_bounds);
       return;
     }
@@ -390,7 +399,9 @@ void displace(bool isAbsolute, int degrees) {
  *      retains more physical precision. The alternative can be off by a few degrees.
  */
 int normalize_pwm(int target_pwm) {
-  return target_pwm;
+  if ((PWM_MIN <= target_pwm) && (target_pwm <= PWM_FULL_REV)) return target_pwm;
+
+  else return map(target_pwm, PWM_FULL_REV, PWM_MAX, PWM_MIN, PWM_FULL_REV);
 }
 
 
