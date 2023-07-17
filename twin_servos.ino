@@ -18,6 +18,8 @@
 // (Note: These use the yellow signal wires as the standard.)
 #define PWM_PIN_X 6
 #define PWM_PIN_Y 3
+#define SERVO_X 0
+#define SERVO_Y 1
 
 #define PWM_MIN 600
 #define PWM_180 1050
@@ -48,6 +50,7 @@ bool commandReady = false;
 
 Servo servoX;
 Servo servoY;
+int currentServo;
 
 // Manually track angular position in *real world* (zero at 180 degrees)
 int curr_pos_x = 180;
@@ -71,16 +74,23 @@ bool moveFlag = false;                    // dumb workaround for a blocking prom
 void setup() {
   Serial.begin(9600);
   delay(2000);
+  printFromFlash(status_setting_up);
 
   // Do not attach until a position or signal is given!
-  printFromFlash(status_setting_up);
   servoX.writeMicroseconds(curr_pwm_x);
+  servoX.writeMicroseconds(curr_pwm_y);
   servoX.attach(PWM_PIN_X, PWM_MIN, PWM_MAX);
+  servoY.attach(PWM_PIN_Y, PWM_MIN, PWM_MAX);
   delay(5000);
   printFromFlash(status_origin_reached);
-  printFromFlash(status_setup_done);
 
-  // servoY.attach(PWM_PIN_Y, PWM_MIN, PWM_MAX);
+  // Hopefully temp solution
+  currentServo = SERVO_X;
+  Serial.print("[DEBUG] Set servo: ");
+  if (currentServo == SERVO_X) Serial.println("X");
+  else Serial.println("Y");
+
+  printFromFlash(status_setup_done);
 }
 
 void loop() {
@@ -134,6 +144,7 @@ void processCommand() {
     else if (strcmp(commandMessage, "sweep") == 0) sweep(commandArg);
     else if (strcmp(commandMessage, "halt") == 0) stopMotor();
     else if (strcmp(commandMessage, "test") == 0) testSpeed(commandArg);
+    else if (strcmp(commandMessage, "servo") == 0) switchServo(commandArg);
     else printFromFlash(error_invalid);
     
     commandReady = false;
@@ -218,6 +229,22 @@ void showCurrentPositions() {
 }
 
 
+/*  'servo' 
+ *  
+ *  Specify which of the two motors is to be configured or commanded.
+ *  (Hopefully a temporary solution.)
+*/
+void switchServo(int servo) {
+  if ((servo != SERVO_X) && (servo != SERVO_Y)) {
+    Serial.println("ERROR: invalid servo selection. Please enter either 0 or 1 (for X or Y).");
+  }
+  currentServo = servo;
+  Serial.print("[DEBUG] Set servo: ");
+  if (currentServo == SERVO_X) Serial.println("X");
+  else Serial.println("Y");
+}
+
+
 /* 'origin' 
  * 
  * Sets current position as the new starting point of 180 degrees
@@ -275,8 +302,6 @@ void sendPwmSignal(int target_pwm) {
     }
   }
 
-  // servoX.attach(PWM_PIN_X, PWM_MIN, PWM_MAX);
-
   // Convert PWM period to degrees
   int target_pos = map(target_pwm, PWM_MIN, PWM_FULL_REV, 0, 360);
 
@@ -285,11 +310,19 @@ void sendPwmSignal(int target_pwm) {
   Serial.println(" degrees");
 
   // Travel towards the target angle in steps of 5
-  int sig = curr_pwm_x;
+  int curr_pwm;
+  int curr_pos;
+  // TODO: Declare Servo pointer here, instead of using all the conditionals below.
 
-  if (curr_pwm_x <= target_pwm) {
+  if (currentServo == SERVO_X) curr_pwm = curr_pwm_x;
+  else curr_pwm = curr_pwm_y;
+
+  int sig = curr_pwm;
+
+  if (curr_pwm <= target_pwm) {
     while (sig <= target_pwm) {
-      servoX.writeMicroseconds(sig);
+      if (currentServo == SERVO_X) servoX.writeMicroseconds(sig);
+      else servoY.writeMicroseconds(sig);
       Serial.println(sig);
       delay(15);
       sig += 5;
@@ -297,15 +330,24 @@ void sendPwmSignal(int target_pwm) {
   }
   else { //turn backwards
     while (sig >= target_pwm) {
-      servoX.writeMicroseconds(sig);
+      if (currentServo == SERVO_X) servoX.writeMicroseconds(sig);
+      else servoY.writeMicroseconds(sig);
       Serial.println(sig);
       delay(15);
       sig -= 5;
     }
   }
-  servoX.writeMicroseconds(target_pwm);   //final push to ensure accuracy
-  curr_pwm_x = target_pwm;
-  curr_pos_x = target_pos;
+  // Final push to ensure accuracy
+  if (currentServo == SERVO_X) {
+    servoX.writeMicroseconds(target_pwm);
+    curr_pwm_x = target_pwm;
+    curr_pos_x = target_pos;
+  }
+  else {
+    servoY.writeMicroseconds(target_pwm);
+    curr_pwm_y = target_pwm;
+    curr_pos_y = target_pos;
+  }
   // servoX.detach();
 }
 
@@ -373,7 +415,12 @@ void displace(bool isAbsolute, int degrees) {
       printFromFlash(error_move_bounds);
       return;
     }
-    target_pwm = map((curr_pos_x + degrees), 0, 360, PWM_MIN, PWM_FULL_REV);
+    if (currentServo == SERVO_X) {
+      target_pwm = map((curr_pos_x + degrees), 0, 360, PWM_MIN, PWM_FULL_REV);
+    }
+    else {
+      target_pwm = map((curr_pos_y + degrees), 0, 360, PWM_MIN, PWM_FULL_REV);
+    }
   }
 
   else {
