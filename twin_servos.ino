@@ -31,27 +31,15 @@ const char status_setting_up[] PROGMEM = "\n\nSTATUS: setting up, please wait...
 const char status_origin_reached[] PROGMEM = "STATUS: origin initialized at 180 degrees\n";
 const char status_setup_done[] PROGMEM = "STATUS: setup complete. Please enter a command.\n";
 const char status_normalizing[] PROGMEM = "STATUS: normalizing PWM signal...\n";
-const char prompt_normalize_pwm[] PROGMEM = "PROMPT: Do you want to instead turn to the destination in the opposite direction? ('y', or any key to cancel)\n";
+const char status_normalize_cancelled[] PROGMEM = "STATUS: PWM normalization cancelled.\n";
+const char prompt_normalize_pwm1[] PROGMEM = "\nPROMPT: Do you want to proceed with a normalized PWM? Servo may spin in the opposite direction.\n";
+const char prompt_normalize_pwm2[] PROGMEM = "PROMPT: Press 'y', or any other key to cancel.\n\n";
 const char warning_serial[] PROGMEM = "<Warning: Index has exceeded string length>\n";
 const char warning_pwm_bounds[] PROGMEM = "<Warning: Destination exceeds acceptable PWM bounds of 600-1500 usec>\n";
 const char error_invalid[] PROGMEM = "ERROR: please input a valid command.\n";
 const char error_move_bounds[] PROGMEM = "ERROR: please choose a degrees value between -359 and 359.\n";
 const char error_goto_bounds[] PROGMEM = "ERROR: please choose a degrees value between 0 and 360.\n";
-const char pos_get1[] PROGMEM = "GET: Current motor position is ";
-const char pos_get2[] PROGMEM = " microsteps from origin";
-const char origin_set[] PROGMEM = "UPDATE: origin has been reset to current position\n";
-const char speed_set1[] PROGMEM = "UPDATE: motor running speed is now ";
-const char revs_per_sec[] PROGMEM = " revs per second/s";
-const char error_running_a[] PROGMEM = "ERROR: motor must first not be running\n";
-const char error_running_b[] PROGMEM = "ERROR: motor is already running\n";
-const char status_running[] PROGMEM = "STATUS: motor is now running\n";
-const char error_limit[] PROGMEM = "ERROR: limit has been reached, cannot resume without restarting\n";
-const char error_frozen[] PROGMEM = "ERROR: motor is already frozen\n";
-const char status_frozen[] PROGMEM = "STATUS: motor is now frozen\n";
-const char error_stopped[] PROGMEM = "ERROR: motor is already paused/stopped\n";
-const char status_pausing[] PROGMEM = "STATUS: motor is now pausing...\n";
-const char status_stopped[] PROGMEM = "STATUS: motor is now stopped. Counter has been reset.\n";
-const char status_restarting[] PROGMEM = "STATUS: motor is now restarting...\n";
+const char error_unexpected_value[] PROGMEM = "ERROR: unexpected PWM value. Please review the bounds.\n";
 
 // For reading Serial string data
 const byte numChars = 32;
@@ -127,6 +115,7 @@ void processCommand() {
     }
     //else Serial.println("ERROR: Invalid input.\n  Try: [command] [arg]\n");
 
+    // Echo serial input to terminal
     Serial.print(commandMessage);
     Serial.print(" ");
     if (argFound) {
@@ -259,11 +248,15 @@ void sendPwmSignal(int target_pwm) {
     moveFlag = true;
 
     printFromFlash(warning_pwm_bounds);
-    printFromFlash(prompt_normalize_pwm);
+    printFromFlash(prompt_normalize_pwm1);
+    printFromFlash(prompt_normalize_pwm2);
 
     // Block until input
     while (Serial.available() == 0) {}
     answer = Serial.read();
+
+    // Echo serial input to terminal
+    Serial.println(answer);
 
     // Intercepts the newline added by the Serial Monitor
     // (Otherwise, the loop() function will get it first!)
@@ -276,7 +269,10 @@ void sendPwmSignal(int target_pwm) {
       printFromFlash(status_normalizing);
       target_pwm = normalize_pwm(target_pwm);
     }
-    else return;
+    else {
+      printFromFlash(status_normalize_cancelled);
+      return;
+    }
   }
 
   // servoX.attach(PWM_PIN_X, PWM_MIN, PWM_MAX);
@@ -392,32 +388,51 @@ void displace(bool isAbsolute, int degrees) {
 
 
 /*
- *  If target_pwm exceeds 1500usec, then convert it to another value that retains the
- *  same position in degrees. Otherwise, do nothing.
+ *  If target_pwm is below 600usec, or exceeds 1500usec, then convert it to another
+ *  value that retains the same position in degrees. This is achieved by wrapping the
+ *  value around the range 600-1500. Negative numbers, or much larger numbers, may 
+ *  require multiple wrapping operations.
  *
- *  Ex: Both 1650 and 750 usec roughly correspond to the 60-degree angle, but 750 usec
+ *  Ex: Both 1650 and 750usec roughly correspond to the 60-degree angle, but 750 usec
  *      retains more physical precision. The alternative can be off by a few degrees.
  */
 int normalize_pwm(int target_pwm) {
+  while (target_pwm < PWM_MIN) {
+    target_pwm = PWM_FULL_REV - abs(PWM_MIN - target_pwm);
+  }
+  while (PWM_FULL_REV < target_pwm) {
+    target_pwm = PWM_MIN + abs(target_pwm - PWM_FULL_REV);
+  }
+
   if ((PWM_MIN <= target_pwm) && (target_pwm <= PWM_FULL_REV)) return target_pwm;
 
-  else return map(target_pwm, PWM_FULL_REV, PWM_MAX, PWM_MIN, PWM_FULL_REV);
+  else {
+    printFromFlash(error_unexpected_value);
+    // TODO: halt operation
+  }
 }
 
 
 /*  'sweep'
  *
- *  Continuously turns the servo to and from a specified angle from the origin
+ *  Continuously turns the servo back and forth at a specified angle from rest.
  *
- *  Ex: degrees = 90 and origin = 180: 
- *      Servo turns back and forth between 90 and 270 degrees.
+ *  Ex: degrees = 60 and start = 180: 
+ *      Servo oscillates between 120 and 240 degrees.
  */
 void sweep(int degrees) {
 
+  // Initial turn
+  if (!isHalted) displace(false, degrees);
+  delay(2000);
 
+  // TODO: Vary delay time depending on travel distance. 
+  //       May overlap with speed control implementation.
   while (!isHalted) {
-    displace(false, degrees);
-    displace(false, -(degrees));
+    displace(false, -(degrees*2));
+    delay(3000);
+    displace(false, degrees*2);
+    delay(3000);
   }
 }
 
