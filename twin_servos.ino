@@ -3,6 +3,12 @@
  *    The two servo motors are the HiTEC HS-785HB, which has a max PWM signal range of
  *    600-2400 microseconds (usec).
  *
+ *    (Note: The Pro Micro requires a detachment of the PWM pins after every servo
+ *           movement, or else it will emit a ton of audible noise. However, doing so 
+ *           disables the servo's encoder, which means position may be lost with a 
+ *           simple nudge. Best to just stick with the Uno board since it's more
+ *           powerful and can better handle the power draw of 2 servos.)
+ *
  *    It has been observed that 600-1500usec is approximately the range equivalent to 
  *    0-360 degrees for the driven gear, given a two-gear ratio of 3.8.
  *
@@ -78,7 +84,7 @@ void setup() {
 
   // Do not attach until a position or signal is given!
   servoX.writeMicroseconds(curr_pwm_x);
-  servoX.writeMicroseconds(curr_pwm_y);
+  servoY.writeMicroseconds(curr_pwm_y);
   servoX.attach(PWM_PIN_X, PWM_MIN, PWM_MAX);
   servoY.attach(PWM_PIN_Y, PWM_MIN, PWM_MAX);
   delay(5000);
@@ -323,7 +329,7 @@ void sendPwmSignal(int target_pwm) {
     while (sig <= target_pwm) {
       if (currentServo == SERVO_X) servoX.writeMicroseconds(sig);
       else servoY.writeMicroseconds(sig);
-      Serial.println(sig);
+      // Serial.println(sig);
       delay(15);
       sig += 5;
     }
@@ -332,7 +338,7 @@ void sendPwmSignal(int target_pwm) {
     while (sig >= target_pwm) {
       if (currentServo == SERVO_X) servoX.writeMicroseconds(sig);
       else servoY.writeMicroseconds(sig);
-      Serial.println(sig);
+      // Serial.println(sig);
       delay(15);
       sig -= 5;
     }
@@ -467,20 +473,62 @@ int normalize_pwm(int target_pwm) {
  *  Ex: degrees = 60 and start = 180: 
  *      Servo oscillates between 120 and 240 degrees.
  */
-void sweep(int degrees) {
+// void sweep(int degrees) {
 
-  // Initial turn
-  if (!isHalted) displace(false, degrees);
+//   // Initial turn
+//   if (!isHalted) displace(false, degrees);
+//   delay(2000);
+
+//   // TODO: Vary delay time depending on travel distance. 
+//   //       May overlap with speed control implementation.
+//   while (!isHalted) {
+//     displace(false, -(degrees*2));
+//     delay(2000);
+//     displace(false, degrees*2);
+//     delay(2000);
+//   }
+// }
+
+void sweep(int degrees) {
+  int x_pos = 180;
+  bool forward_flag = true;
+
+  // currentServo = SERVO_X;
+  // displace(false, )
+
+  // Start sweeping Y, at X's 180 position
+  currentServo = SERVO_Y;
+  Serial.print("[DEBUG] servo is now: Y");
+  displace(false, 40);
+  delay(2000);
+  displace(false, -80);
   delay(2000);
 
-  // TODO: Vary delay time depending on travel distance. 
-  //       May overlap with speed control implementation.
-  while (!isHalted) {
-    displace(false, -(degrees*2));
-    delay(3000);
-    displace(false, degrees*2);
-    delay(3000);
+  while(!isHalted) {
+    if ((x_pos != 240) && (forward_flag)) {
+      currentServo = SERVO_X;
+      Serial.print("[DEBUG] servo is now: X");
+      displace(false, 20);
+      delay(2000);
+      x_pos += 20;
+      if (x_pos == 240) forward_flag = false;
+    }
+    else if ((x_pos != 120) && (!forward_flag)) {
+      currentServo = SERVO_X;
+      Serial.print("[DEBUG] servo is now: X");
+      displace(false, -20);
+      delay(2000);
+      x_pos -= 20;
+      if (x_pos == 120) forward_flag = true;
+    }
+    currentServo = SERVO_Y;
+    Serial.print("[DEBUG] servo is now: Y");
+    displace(false, 80);
+    delay(2000);
+    displace(false, -80);
+    delay(2000);
   }
+
 }
 
 
