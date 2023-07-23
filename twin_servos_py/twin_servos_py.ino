@@ -65,6 +65,8 @@ void loop() {
   if (strcmp(commandInput, "pos") == 0) showCurrentPositions();
   else if (strcmp(commandInput, "servo") == 0) switchServo(argInputs[0]);
   else if (strcmp(commandInput, "pwm") == 0) sendPwmSignal(argInputs[0]);
+  else if (strcmp(commandInput, "move") == 0) displace(false, argInputs[0]);
+  else if (strcmp(commandInput, "goto") == 0) displace(true, argInputs[0]);
 
   // Prevents Arduino from continuously executing the last command received
   strcpy(ardBridge.headerOfMsg, "xyz");
@@ -191,4 +193,38 @@ void sendPwmSignal(int target_pwm) {
     curr_pwm_y = target_pwm;
     curr_pos_y = target_pos;
   }
+}
+
+
+/*  'move [# degrees]' or 'goto [degrees from origin]'
+ *
+ *  If 'isAbsolute' is false, then displace the motor by the specified # of degrees from
+ *  the current position.
+ *
+ *  Otherwise, displace the motor towards the absolute position between 0 and 360 degrees.
+*/
+void displace(bool isAbsolute, int degrees) {
+  int target_pwm;
+
+  if (!isAbsolute) {
+    if ((degrees < -359) || (359 < degrees)) {
+      Serial.println("<ERROR - Choose between -359 and 359>");
+      return;
+    }
+    if (currentServo == SERVO_X) {
+      target_pwm = map((curr_pos_x + degrees), 0, 360, PWM_MIN, PWM_FULL_REV);
+    }
+    else {
+      target_pwm = map((curr_pos_y + degrees), 0, 360, PWM_MIN, PWM_FULL_REV);
+    }
+  }
+
+  else {
+    if ((degrees < 0) || (360 < degrees)) {
+      Serial.println("<ERROR - Choose between 0 and 360>");
+      return;
+    }
+    target_pwm = map(degrees, 0, 360, PWM_MIN, PWM_FULL_REV);
+  }
+  sendPwmSignal(target_pwm);
 }
