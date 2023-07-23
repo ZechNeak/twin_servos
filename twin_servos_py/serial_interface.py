@@ -31,6 +31,7 @@ while True:
         else:
             value = -1
 
-        ardResponse = ardBridge.writeAndRead_HeaderAndTwoLists(command, [value], [])
+        fullMessage = ["<" + command + "," + str(value) + ">"]
+        ardResponse = ardBridge.writeAndRead_Strings(fullMessage)
 
 ardBridge.close()
