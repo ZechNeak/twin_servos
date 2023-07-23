@@ -102,7 +102,10 @@ void setup() {
 void loop() {
   if ((Serial.available() > 0) && moveFlag == false) {
     serialCommandEvent();
+    Serial.println("Yes");
   }
+  Serial.println("No Command");
+  delay(1000);
 }
 
 /* ==================================================================================================== */
@@ -148,6 +151,7 @@ void processCommand() {
     else if (strcmp(commandMessage, "move") == 0) displace(false, commandArg);
     else if (strcmp(commandMessage, "goto") == 0) displace(true, commandArg);
     else if (strcmp(commandMessage, "sweep") == 0) sweep(commandArg);
+    else if (strcmp(commandMessage, "fullsweep") == 0) sweep_all();
     else if (strcmp(commandMessage, "halt") == 0) stopMotor();
     else if (strcmp(commandMessage, "test") == 0) testSpeed(commandArg);
     else if (strcmp(commandMessage, "servo") == 0) switchServo(commandArg);
@@ -311,7 +315,9 @@ void sendPwmSignal(int target_pwm) {
   // Convert PWM period to degrees
   int target_pos = map(target_pwm, PWM_MIN, PWM_FULL_REV, 0, 360);
 
-  Serial.print("Turning to ");
+  if (currentServo == 0) Serial.print("Servo X");
+  else if (currentServo == 1) Serial.print("Servo Y");
+  Serial.print(" turning to ");
   Serial.print(String(target_pos));
   Serial.println(" degrees");
 
@@ -331,7 +337,7 @@ void sendPwmSignal(int target_pwm) {
       else servoY.writeMicroseconds(sig);
       // Serial.println(sig);
       delay(15);
-      sig += 5;
+      sig += 1;
     }
   }
   else { //turn backwards
@@ -340,7 +346,7 @@ void sendPwmSignal(int target_pwm) {
       else servoY.writeMicroseconds(sig);
       // Serial.println(sig);
       delay(15);
-      sig -= 5;
+      sig -= 1;
     }
   }
   // Final push to ensure accuracy
@@ -473,23 +479,23 @@ int normalize_pwm(int target_pwm) {
  *  Ex: degrees = 60 and start = 180: 
  *      Servo oscillates between 120 and 240 degrees.
  */
-// void sweep(int degrees) {
-
-//   // Initial turn
-//   if (!isHalted) displace(false, degrees);
-//   delay(2000);
-
-//   // TODO: Vary delay time depending on travel distance. 
-//   //       May overlap with speed control implementation.
-//   while (!isHalted) {
-//     displace(false, -(degrees*2));
-//     delay(2000);
-//     displace(false, degrees*2);
-//     delay(2000);
-//   }
-// }
-
 void sweep(int degrees) {
+
+  // Initial turn
+  if (!isHalted) displace(false, degrees);
+  delay(2000);
+
+  // TODO: Vary delay time depending on travel distance. 
+  //       May overlap with speed control implementation.
+  while (!isHalted) {
+    displace(false, -(degrees*2));
+    delay(2000);
+    displace(false, degrees*2);
+    delay(2000);
+  }
+}
+
+void sweep_all() {
   int x_pos = 180;
   bool forward_flag = true;
 
@@ -498,7 +504,7 @@ void sweep(int degrees) {
 
   // Start sweeping Y, at X's 180 position
   currentServo = SERVO_Y;
-  Serial.print("[DEBUG] servo is now: Y");
+  Serial.println("[DEBUG] servo is now: Y");
   displace(false, 40);
   delay(2000);
   displace(false, -80);
@@ -507,22 +513,22 @@ void sweep(int degrees) {
   while(!isHalted) {
     if ((x_pos != 240) && (forward_flag)) {
       currentServo = SERVO_X;
-      Serial.print("[DEBUG] servo is now: X");
-      displace(false, 20);
+      Serial.println("[DEBUG] servo is now: X");
+      displace(false, 2);
       delay(2000);
-      x_pos += 20;
-      if (x_pos == 240) forward_flag = false;
+      x_pos += 2;
+      if (x_pos >= 240) forward_flag = false;
     }
     else if ((x_pos != 120) && (!forward_flag)) {
       currentServo = SERVO_X;
-      Serial.print("[DEBUG] servo is now: X");
-      displace(false, -20);
+      Serial.println("[DEBUG] servo is now: X");
+      displace(false, -2);
       delay(2000);
-      x_pos -= 20;
-      if (x_pos == 120) forward_flag = true;
+      x_pos -= 2;
+      if (x_pos <= 120) forward_flag = true;
     }
     currentServo = SERVO_Y;
-    Serial.print("[DEBUG] servo is now: Y");
+    Serial.println("[DEBUG] servo is now: Y");
     displace(false, 80);
     delay(2000);
     displace(false, -80);
