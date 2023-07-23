@@ -534,7 +534,6 @@ void sweep_all() {
     displace(false, -80);
     delay(2000);
   }
-
 }
 
 

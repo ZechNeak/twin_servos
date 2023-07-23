@@ -20,6 +20,7 @@ Bridge_ino ardBridge(Serial);
 Servo servoX;
 Servo servoY;
 int currentServo;
+bool isHalted = false;
 
 // Manually track angular position in *real world* (zero at 180 degrees)
 int curr_pos_x = 180;
@@ -67,6 +68,8 @@ void loop() {
   else if (strcmp(commandInput, "pwm") == 0) sendPwmSignal(argInputs[0]);
   else if (strcmp(commandInput, "move") == 0) displace(false, argInputs[0]);
   else if (strcmp(commandInput, "goto") == 0) displace(true, argInputs[0]);
+  else if (strcmp(commandInput, "sweep") == 0) sweep(argInputs[0]);
+  else if (strcmp(commandInput, "fullsweep") == 0) sweep_all();
 
   // Prevents Arduino from continuously executing the last command received
   strcpy(ardBridge.headerOfMsg, "xyz");
@@ -227,4 +230,77 @@ void displace(bool isAbsolute, int degrees) {
     target_pwm = map(degrees, 0, 360, PWM_MIN, PWM_FULL_REV);
   }
   sendPwmSignal(target_pwm);
+}
+
+
+/*  'sweep'
+ *
+ *  Continuously turns the servo back and forth at a specified angle from rest.
+ *
+ *  Ex: degrees = 60 and start = 180:
+ *      Servo oscillates between 120 and 240 degrees.
+ */
+void sweep(int degrees) {
+
+  // Initial turn
+  if (!isHalted) displace(false, degrees);
+  delay(2000);
+
+  // TODO: Vary delay time depending on travel distance.
+  //       May overlap with future speed control implementation.
+  while (!isHalted) {
+    displace(false, -(degrees*2));
+    delay(2000);
+    displace(false, degrees*2);
+    delay(2000);
+  }
+}
+
+
+/*  'fullsweep'
+ *
+ *  Continuously turns both servos back and forth for a predetermined range.
+ *
+ *  For every 10 horizontal degrees between 120 and 240, Servo Y will sweep
+ *  80 vertical degrees for each direction up and down.
+ */
+void sweep_all() {
+  int x_pos = 180;
+  bool forward_flag = true;
+
+  // currentServo = SERVO_X;
+  // displace(false, )
+
+  // Start sweeping Y, at X's 180 position
+  currentServo = SERVO_Y;
+  Serial.println("[DEBUG] servo is now: Y");
+  displace(false, 40);
+  delay(2000);
+  displace(false, -80);
+  delay(2000);
+
+  while(!isHalted) {
+    if ((x_pos != 240) && (forward_flag)) {
+      currentServo = SERVO_X;
+      Serial.println("[DEBUG] servo is now: X");
+      displace(false, 10);
+      delay(2000);
+      x_pos += 10;
+      if (x_pos >= 240) forward_flag = false;
+    }
+    else if ((x_pos != 120) && (!forward_flag)) {
+      currentServo = SERVO_X;
+      Serial.println("[DEBUG] servo is now: X");
+      displace(false, -10);
+      delay(2000);
+      x_pos -= 10;
+      if (x_pos <= 120) forward_flag = true;
+    }
+    currentServo = SERVO_Y;
+    Serial.println("[DEBUG] servo is now: Y");
+    displace(false, 80);
+    delay(2000);
+    displace(false, -80);
+    delay(2000);
+  }
 }
