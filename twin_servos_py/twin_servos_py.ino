@@ -19,6 +19,7 @@ Bridge_ino ardBridge(Serial);
 
 Servo servoX;
 Servo servoY;
+int currentServo;
 
 // Manually track angular position in *real world* (zero at 180 degrees)
 int curr_pos_x = 180;
@@ -62,12 +63,7 @@ void loop() {
   // Match command and execute it
   // TODO: Create an alphabetically sorted array of string-function pairs and use binary search instead
   if (strcmp(commandInput, "pos") == 0) showCurrentPositions();
-
-  // else Serial.println("<ERROR: Please input a valid command.>");
-
-  // Echos back received data
-  // (Note: Any print via serial is required for the Python script to continue)
-  ardBridge.write_HeaderAndTwoArrays(commandInput, argInputs, 1, ardBridge.floatsRecvd, 0);
+  else if (strcmp(commandInput, "servo") == 0) switchServo(argInputs[0]);
 
   // Prevents Arduino from continuously executing the last command received
   strcpy(ardBridge.headerOfMsg, "xyz");
@@ -91,4 +87,22 @@ void showCurrentPositions() {
   Serial.print(", ");
   Serial.print(curr_pos_y);
   Serial.println(">");
+}
+
+
+/*  'servo'
+ *
+ *  Specify which of the two motors is to be configured or commanded.
+ *  (Hopefully a temporary solution.)
+*/
+void switchServo(int servo) {
+  if ((servo != SERVO_X) && (servo != SERVO_Y)) {
+    Serial.println("<ERROR - Invalid servo. (0 or 1)>");
+  }
+  else {
+    currentServo = servo;
+    Serial.print("<STATUS - Set servo: ");
+    if (currentServo == SERVO_X) Serial.println("X>");
+    else Serial.println("Y>");
+  }
 }
