@@ -26,6 +26,9 @@ bool isHalted = false;
 int curr_pos_x = 180;
 int curr_pos_y = 180;
 
+// I know this global var is accruing technical debt but I'm in a rush
+int target_pos = 180;
+
 // Closest PWM signal that represents 180 degrees in *real world*.
 // Every 90-degree real-world turn is consistently a 255usec difference.
 int curr_pwm_x = PWM_180;
@@ -69,7 +72,7 @@ void loop() {
   else if (strcmp(commandInput, "move") == 0) displace(false, argInputs[0]);
   else if (strcmp(commandInput, "goto") == 0) displace(true, argInputs[0]);
   else if (strcmp(commandInput, "sweep") == 0) sweep(argInputs[0]);
-  else if (strcmp(commandInput, "fullsweep") == 0) sweep_all();
+  else if (strcmp(commandInput, "fullsweep") == 0) sweep_all(argInputs[0]);
 
   // Prevents Arduino from continuously executing the last command received
   strcpy(ardBridge.headerOfMsg, "xyz");
@@ -103,11 +106,11 @@ void showCurrentPositions() {
 */
 void switchServo(int servo) {
   if ((servo != SERVO_X) && (servo != SERVO_Y)) {
-    Serial.println("<ERROR - Invalid servo. (0 or 1)>");
+    Serial.println("<ERROR -- Invalid servo. (0 or 1)>");
   }
   else {
     currentServo = servo;
-    Serial.print("<STATUS - Set servo: ");
+    Serial.print("<STATUS -- Set servo: ");
     if (currentServo == SERVO_X) Serial.println("X>");
     else Serial.println("Y>");
   }
@@ -147,9 +150,6 @@ void sendPwmSignal(int target_pwm) {
   if (target_pwm < PWM_MIN || PWM_FULL_REV < target_pwm) {
     target_pwm = normalize_pwm(target_pwm);
   }
-
-  // Convert PWM period to degrees
-  int target_pos = map(target_pwm, PWM_MIN, PWM_FULL_REV, 0, 360);
 
   if (currentServo == 0) Serial.print("<Servo X");
   else if (currentServo == 1) Serial.print("<Servo Y");
@@ -211,22 +211,24 @@ void displace(bool isAbsolute, int degrees) {
 
   if (!isAbsolute) {
     if ((degrees < -359) || (359 < degrees)) {
-      Serial.println("<ERROR - Choose between -359 and 359>");
+      Serial.println("<ERROR -- Choose between -359 and 359>");
       return;
     }
     if (currentServo == SERVO_X) {
-      target_pwm = map((curr_pos_x + degrees), 0, 360, PWM_MIN, PWM_FULL_REV);
+      target_pos = (curr_pos_x + degrees);
     }
     else {
-      target_pwm = map((curr_pos_y + degrees), 0, 360, PWM_MIN, PWM_FULL_REV);
+      target_pos = (curr_pos_y + degrees);
     }
+    target_pwm = map(target_pos, 0, 360, PWM_MIN, PWM_FULL_REV);
   }
 
   else {
     if ((degrees < 0) || (360 < degrees)) {
-      Serial.println("<ERROR - Choose between 0 and 360>");
+      Serial.println("<ERROR -- Choose between 0 and 360>");
       return;
     }
+    target_pos = degrees;
     target_pwm = map(degrees, 0, 360, PWM_MIN, PWM_FULL_REV);
   }
   sendPwmSignal(target_pwm);
@@ -259,48 +261,57 @@ void sweep(int degrees) {
 
 /*  'fullsweep'
  *
- *  Continuously turns both servos back and forth for a predetermined range.
+ *  Continuously turns both servos back and forth for specified ranges.
  *
- *  For every 10 horizontal degrees between 120 and 240, Servo Y will sweep
- *  80 vertical degrees for each direction up and down.
+ *  Servo Y is currently hardcoded to sweep up and down 50 degrees,
+ *  while Servo X moves left and right at a user-defined increment.
  */
-void sweep_all() {
+void sweep_all(int x_degrees) {
   int x_pos = 180;
   bool forward_flag = true;
 
-  // currentServo = SERVO_X;
-  // displace(false, )
+  // Hardcoded for now because I can't take more than 1 argument for my Serial commands...
+  int x_sweep = 80;
+  int y_sweep = 80;
+  int x_bound_min = 180 - (x_sweep/2);
+  int x_bound_max = 180 + (x_sweep/2);
+
+  // Initialize both servos back to their origins
+  currentServo = SERVO_X;
+  displace(true, 180);
+  currentServo = SERVO_Y;
+  displace(true, 180);
+  delay(3000);
+  Serial.println("<++++++++++++++++++++++++++++++++++++++>");
 
   // Start sweeping Y, at X's 180 position
   currentServo = SERVO_Y;
-  Serial.println("[DEBUG] servo is now: Y");
-  displace(false, 40);
+  displace(false, (y_sweep/2));
   delay(2000);
-  displace(false, -80);
+  displace(false, -(y_sweep));
   delay(2000);
+  Serial.println("<++++++++++++++++++++++++++++++++++++++>");
 
   while(!isHalted) {
-    if ((x_pos != 240) && (forward_flag)) {
+    if ((x_pos != x_bound_max) && (forward_flag)) {
       currentServo = SERVO_X;
-      Serial.println("[DEBUG] servo is now: X");
-      displace(false, 10);
+      displace(false, x_degrees);
       delay(2000);
-      x_pos += 10;
-      if (x_pos >= 240) forward_flag = false;
+      x_pos += x_degrees;
+      if (x_pos >= x_bound_max) forward_flag = false;
     }
-    else if ((x_pos != 120) && (!forward_flag)) {
+    else if ((x_pos != x_bound_min) && (!forward_flag)) {
       currentServo = SERVO_X;
-      Serial.println("[DEBUG] servo is now: X");
-      displace(false, -10);
+      displace(false, -(x_degrees));
       delay(2000);
-      x_pos -= 10;
-      if (x_pos <= 120) forward_flag = true;
+      x_pos -= x_degrees;
+      if (x_pos <= x_bound_min) forward_flag = true;
     }
     currentServo = SERVO_Y;
-    Serial.println("[DEBUG] servo is now: Y");
-    displace(false, 80);
+    displace(false, y_sweep);
     delay(2000);
-    displace(false, -80);
+    displace(false, -(y_sweep));
     delay(2000);
+    Serial.println("<++++++++++++++++++++++++++++++++++++++>");
   }
 }

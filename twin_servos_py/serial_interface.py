@@ -17,7 +17,7 @@ userInput = []
 while True:
     userInput = (input("Command for servo: ")).split()
 
-    if (len(userInput) != 2) and (userInput[0] != "pos") and (userInput[0] != "fullsweep"):
+    if (len(userInput) != 2) and (userInput[0] != "pos") and (userInput[0] != "exit"):
         print("ERROR: Format is [command] [#]")
 
     elif userInput[0] == "exit":
@@ -26,16 +26,19 @@ while True:
     else:
         command = userInput[0]
 
-        if (command != "pos") and (command != "fullsweep"):
+        if command != "pos":
             value = int(userInput[1])
         else:
             value = -1
 
         fullMessage = ["<" + command + "," + str(value) + ">"]
         ardResponse = ardBridge.writeAndRead_Strings(fullMessage)
+        # print(ardResponse)
 
-        # TODO: Track "sweepMode" boolean for repeated prints
-        while True:
+        # Prints positions while sweeping
+        # (Note: Blocks user input.)
+        while command == "fullsweep":
             print(ardBridge.read())
+
 
 ardBridge.close()
