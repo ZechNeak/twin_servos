@@ -74,6 +74,11 @@ void loop() {
   else if (strcmp(commandInput, "sweep") == 0) sweep_axis(argInputs[0]);
   else if (strcmp(commandInput, "fullsweep") == 0) sweep_both(argInputs[0]);
 
+  else if (strcmp(commandInput, "xmove") == 0) move_x(argInputs[0]);
+  else if (strcmp(commandInput, "xgoto") == 0) goto_x(argInputs[0]);
+  else if (strcmp(commandInput, "ymove") == 0) move_y(argInputs[0]);
+  else if (strcmp(commandInput, "ygoto") == 0) goto_y(argInputs[0]);
+
   // Prevents Arduino from continuously executing the last command received
   strcpy(ardBridge.headerOfMsg, "xyz");
 }
@@ -318,14 +323,35 @@ void sweep_both(int x_degrees) {
     displace(false, -(y_sweep));
     delay(2000);
     // Serial.println("<++++++++++++++++++++++++++++++++++++++>");
-
-    // Check for a "stop" command to halt sweeping
-    ardBridge.curMillis = millis();
-    ardBridge.read();
-    const char* commandInput = ardBridge.headerOfMsg;
-    int argInputs[] = {ardBridge.intsRecvd[0]};
-
-    if (strcmp(commandInput, "stop") == 0) isHalted = true;
-    strcpy(ardBridge.headerOfMsg, "xyz");
   }
+}
+
+
+/*  'xmove', 'xgoto', 'ymove', 'ygoto'
+ *
+ *  Convenience methods that ensure the current servo is switched,
+ *  before displacing it.
+ *
+ *  These exist only for the Python sweep script, since sending
+ *  "servo" and "move"/"goto" as separate messages to the Arduino
+ *  takes more time than necessary.
+ */
+void move_x(int degrees) {
+  currentServo = SERVO_X;
+  displace(false, degrees);
+}
+
+void goto_x(int degrees) {
+  currentServo = SERVO_X;
+  displace(true, degrees);
+}
+
+void move_y(int degrees) {
+  currentServo = SERVO_Y;
+  displace(false, degrees);
+}
+
+void goto_y(int degrees) {
+  currentServo = SERVO_Y;
+  displace(true, degrees);
 }
