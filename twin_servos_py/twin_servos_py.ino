@@ -58,7 +58,7 @@ void setup() {
 }
 
 void loop() {
-  ardBridge.curMillis = millis(); 
+  ardBridge.curMillis = millis();
   ardBridge.read();
 
   const char* commandInput = ardBridge.headerOfMsg;
@@ -71,8 +71,8 @@ void loop() {
   else if (strcmp(commandInput, "pwm") == 0) sendPwmSignal(argInputs[0]);
   else if (strcmp(commandInput, "move") == 0) displace(false, argInputs[0]);
   else if (strcmp(commandInput, "goto") == 0) displace(true, argInputs[0]);
-  else if (strcmp(commandInput, "sweep") == 0) sweep(argInputs[0]);
-  else if (strcmp(commandInput, "fullsweep") == 0) sweep_all(argInputs[0]);
+  else if (strcmp(commandInput, "sweep") == 0) sweep_axis(argInputs[0]);
+  else if (strcmp(commandInput, "fullsweep") == 0) sweep_both(argInputs[0]);
 
   // Prevents Arduino from continuously executing the last command received
   strcpy(ardBridge.headerOfMsg, "xyz");
@@ -117,8 +117,7 @@ void switchServo(int servo) {
 }
 
 
-/*
- *  If target_pwm is below 600usec, or exceeds 1500usec, then convert it to another
+/*  If target_pwm is below 600usec, or exceeds 1500usec, then convert it to another
  *  value that retains the same position in degrees. This is achieved by wrapping the
  *  value around the range 600-1500. Negative numbers, or much larger numbers, may
  *  require multiple wrapping operations.
@@ -242,7 +241,7 @@ void displace(bool isAbsolute, int degrees) {
  *  Ex: degrees = 60 and start = 180:
  *      Servo oscillates between 120 and 240 degrees.
  */
-void sweep(int degrees) {
+void sweep_axis(int degrees) {
 
   // Initial turn
   if (!isHalted) displace(false, degrees);
@@ -259,16 +258,22 @@ void sweep(int degrees) {
 }
 
 
+/*  Servo Y is currently hardcoded to sweep up and down 40 degrees,
+ *  while Servo X moves left and right at a user-defined increment.
+ */
+// void sweep_step(int x_pos, int x_bound, int x_degrees) {
+  
+// }
+
+
 /*  'fullsweep'
  *
  *  Continuously turns both servos back and forth for specified ranges.
- *
- *  Servo Y is currently hardcoded to sweep up and down 50 degrees,
- *  while Servo X moves left and right at a user-defined increment.
  */
-void sweep_all(int x_degrees) {
+void sweep_both(int x_degrees) {
   int x_pos = 180;
   bool forward_flag = true;
+  isHalted = false;
 
   // Hardcoded for now because I can't take more than 1 argument for my Serial commands...
   int x_sweep = 80;
@@ -282,7 +287,7 @@ void sweep_all(int x_degrees) {
   currentServo = SERVO_Y;
   displace(true, 180);
   delay(3000);
-  Serial.println("<++++++++++++++++++++++++++++++++++++++>");
+  // Serial.println("<++++++++++++++++++++++++++++++++++++++>");
 
   // Start sweeping Y, at X's 180 position
   currentServo = SERVO_Y;
@@ -290,7 +295,7 @@ void sweep_all(int x_degrees) {
   delay(2000);
   displace(false, -(y_sweep));
   delay(2000);
-  Serial.println("<++++++++++++++++++++++++++++++++++++++>");
+  // Serial.println("<++++++++++++++++++++++++++++++++++++++>");
 
   while(!isHalted) {
     if ((x_pos != x_bound_max) && (forward_flag)) {
@@ -312,6 +317,15 @@ void sweep_all(int x_degrees) {
     delay(2000);
     displace(false, -(y_sweep));
     delay(2000);
-    Serial.println("<++++++++++++++++++++++++++++++++++++++>");
+    // Serial.println("<++++++++++++++++++++++++++++++++++++++>");
+
+    // Check for a "stop" command to halt sweeping
+    ardBridge.curMillis = millis();
+    ardBridge.read();
+    const char* commandInput = ardBridge.headerOfMsg;
+    int argInputs[] = {ardBridge.intsRecvd[0]};
+
+    if (strcmp(commandInput, "stop") == 0) isHalted = true;
+    strcpy(ardBridge.headerOfMsg, "xyz");
   }
 }
