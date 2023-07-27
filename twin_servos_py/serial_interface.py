@@ -14,10 +14,13 @@ ardBridge.begin(serPort, baudRate, numIntValues_FromPy=1, numFloatValues_FromPy=
 ardBridge.setSleepTime(2)   # Set this to like 7sec later
 
 userInput = []
+singleCommands = ["pos", "stop", "exit"]
+# userInput = (input("Command for servo: ")).split()
+
 while True:
     userInput = (input("Command for servo: ")).split()
 
-    if (len(userInput) != 2) and (userInput[0] != "pos") and (userInput[0] != "fullsweep"):
+    if (len(userInput) != 2) and (userInput[0] not in singleCommands):
         print("ERROR: Format is [command] [#]")
 
     elif userInput[0] == "exit":
@@ -26,16 +29,19 @@ while True:
     else:
         command = userInput[0]
 
-        if (command != "pos") and (command != "fullsweep"):
+        if command not in singleCommands:
             value = int(userInput[1])
         else:
             value = -1
 
         fullMessage = ["<" + command + "," + str(value) + ">"]
         ardResponse = ardBridge.writeAndRead_Strings(fullMessage)
+        # print(ardResponse)
 
-        # TODO: Track "sweepMode" boolean for repeated prints
-        while True:
-            print(ardBridge.read())
+        # Prints positions while sweeping
+        # (Note: Blocks user input.)
+        # while command == "fullsweep":
+        #     print(ardBridge.read())
+
 
 ardBridge.close()
