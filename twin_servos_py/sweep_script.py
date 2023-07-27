@@ -26,19 +26,12 @@ x_bound_min = 180 - (x_sweep/2)
 x_bound_max = 180 + (x_sweep/2)
 
 # Initialize both servos back to their origins
-ardResponse = ardBridge.writeAndRead_Strings(["<servo,0>"])
-# ardBridge.setSleepTime(1)
-ardResponse = ardBridge.writeAndRead_Strings(["<goto,180>"])
-# ardBridge.setSleepTime(1)
-ardResponse = ardBridge.writeAndRead_Strings(["<servo,1>"])
-# ardBridge.setSleepTime(1)
-ardResponse = ardBridge.writeAndRead_Strings(["<goto,180>"])
-# ardBridge.setSleepTime(3)
+ardResponse = ardBridge.writeAndRead_Strings(["<xgoto,180>"])
+ardResponse = ardBridge.writeAndRead_Strings(["<ygoto,180>"])
 print("++++++++++++++++++++++++++++++++++++++")
 
 # Start by sweeping Y from the origin
-ardResponse = ardBridge.writeAndRead_Strings(["<servo,1>"])
-ardResponse = ardBridge.writeAndRead_Strings(["<move," + str(y_sweep/2) + ">"])
+ardResponse = ardBridge.writeAndRead_Strings(["<ymove," + str(y_sweep/2) + ">"])
 ardBridge.setSleepTime(2)
 ardResponse = ardBridge.writeAndRead_Strings(["<move," + str(-(y_sweep)) + ">"])
 ardBridge.setSleepTime(2)
@@ -49,24 +42,19 @@ while True:
 
     # Move Servo X by a step in either direction
     if (x_pos != x_bound_max) and (forward_flag):
-        ardResponse = ardBridge.writeAndRead_Strings(["<servo,0>"])
-        ardResponse = ardBridge.writeAndRead_Strings(["<move," + str(x_step) + ">"])
-        # ardBridge.setSleepTime(2)
+        ardResponse = ardBridge.writeAndRead_Strings(["<xmove," + str(x_step) + ">"])
         x_pos += x_step
         if (x_pos >= x_bound_max):
             forward_flag = False
 
     elif (x_pos != x_bound_min) and (not forward_flag):
-        ardResponse = ardBridge.writeAndRead_Strings(["<servo,0>"])
-        ardResponse = ardBridge.writeAndRead_Strings(["<move," + str(-(x_step)) + ">"])
-        # ardBridge.setSleepTime(2)
+        ardResponse = ardBridge.writeAndRead_Strings(["<xmove," + str(-(x_step)) + ">"])
         x_pos -= x_step
         if (x_pos <= x_bound_min):
             forward_flag = True
 
     # Move Servo Y up and then down
-    ardResponse = ardBridge.writeAndRead_Strings(["<servo,1>"])
-    ardResponse = ardBridge.writeAndRead_Strings(["<move," + str(y_sweep) + ">"])
+    ardResponse = ardBridge.writeAndRead_Strings(["<ymove," + str(y_sweep) + ">"])
     ardBridge.setSleepTime(2)
     ardResponse = ardBridge.writeAndRead_Strings(["<move," + str(-(y_sweep)) + ">"])
     ardBridge.setSleepTime(2)
