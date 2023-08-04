@@ -73,11 +73,14 @@ void loop() {
   else if (strcmp(commandInput, "goto") == 0) displace(true, argInputs[0]);
   else if (strcmp(commandInput, "sweep") == 0) sweep_axis(argInputs[0]);
   else if (strcmp(commandInput, "fullsweep") == 0) sweep_both(argInputs[0]);
+  else if (strcmp(commandInput, "attach") == 0) attach_servo(argInputs[0]);
+  else if (strcmp(commandInput, "detach") == 0) detach_servo(argInputs[0]);
 
   else if (strcmp(commandInput, "xmove") == 0) move_x(argInputs[0]);
   else if (strcmp(commandInput, "xgoto") == 0) goto_x(argInputs[0]);
   else if (strcmp(commandInput, "ymove") == 0) move_y(argInputs[0]);
   else if (strcmp(commandInput, "ygoto") == 0) goto_y(argInputs[0]);
+
 
   // Prevents Arduino from continuously executing the last command received
   strcpy(ardBridge.headerOfMsg, "xyz");
@@ -118,6 +121,61 @@ void switchServo(int servo) {
     Serial.print("<STATUS -- Set servo: ");
     if (currentServo == SERVO_X) Serial.println("X>");
     else Serial.println("Y>");
+  }
+}
+
+
+/*  'attach'
+ *
+ *  Can provide Pyduino access to Servo's attach().
+ *
+ *  Links Arduino to a connected servo, powering up its encoder
+ *  and ensuring that the servo's current rough position is held.
+ *
+ *  Required before giving commands to a servo.
+*/
+void attach_servo(int servo) {
+  if ((servo != SERVO_X) && (servo != SERVO_Y)) {
+    Serial.println("<ERROR -- Invalid servo. (0 or 1)>");
+  }
+  else {
+    Serial.print("<STATUS -- Attached servo: ");
+    if (servo == SERVO_X) {
+      servoX.attach(PWM_PIN_X, PWM_MIN, PWM_MAX);
+      Serial.println("X>");
+    }
+    else {
+      servoY.attach(PWM_PIN_Y, PWM_MIN, PWM_MAX);
+      Serial.println("Y>");
+    }
+  }
+}
+
+
+/*  'detach'
+ *
+ *  Can provide Pyduino access to Servo's detach().
+ *
+ *  Unlinks Arduino from a connected servo, shutting off its encoder
+ *  and allowing the servo to sit (or turn) unrestricted.
+ *
+ *  If the intention is to keep the servo at rest without jitter due
+ *  to its periodic ticking, this may be necessary.
+*/
+void detach_servo(int servo) {
+  if ((servo != SERVO_X) && (servo != SERVO_Y)) {
+    Serial.println("<ERROR -- Invalid servo. (0 or 1)>");
+  }
+  else {
+    Serial.print("<STATUS -- Detached servo: ");
+    if (servo == SERVO_X) {
+      servoX.detach();
+      Serial.println("X>");
+    }
+    else {
+      servoY.detach();
+      Serial.println("Y>");
+    }
   }
 }
 
